@@ -1,0 +1,19 @@
+# Design System AI — dependências Python
+# Instale com: pip install -r requirements.txt
+
+# API Anthropic (Claude) — Q3, Q4, gerador de ADRs
+anthropic==0.40.0
+
+# Banco vetorial — RAG de Referência e Decisão
+psycopg2-binary==2.9.9
+pgvector==0.3.6
+
+# Embeddings — text-embedding-3-small
+openai==1.50.0
+
+# Interface web — painel para designers
+fastapi==0.115.0
+uvicorn==0.32.0
+
+# Utilitários
+python-dotenv==1.0.1

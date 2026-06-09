@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Design System — Painel de Governanca</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: #f8fafc; color: #1e293b; }
+    .header { background: #1b3a5c; padding: 20px 40px; }
+    .header h1 { color: white; font-size: 22px; font-weight: 600; }
+    .container { max-width: 860px; margin: 32px auto; padding: 0 20px; }
+    .card { background: white; border: 1px solid #e2e8f0; border-radius: 10px; padding: 28px; margin-bottom: 24px; box-shadow: 0 1px 4px rgba(0,0,0,0.05); }
+    .card h2 { font-size: 18px; color: #1b3a5c; margin-bottom: 6px; }
+    .card p { font-size: 13px; color: #64748b; margin-bottom: 18px; }
+    label { display: block; font-size: 13px; font-weight: 500; color: #374151; margin: 12px 0 4px; }
+    input, textarea { width: 100%; padding: 9px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; font-family: inherit; outline: none; }
+    input:focus, textarea:focus { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
+    textarea { resize: vertical; }
+    .btn { display: inline-block; margin-top: 16px; padding: 10px 22px; background: #2563eb; color: white; border: none; border-radius: 6px; font-size: 14px; font-weight: 500; cursor: pointer; }
+    .btn:hover { background: #1d4ed8; }
+    .btn:disabled { background: #93c5fd; cursor: not-allowed; }
+    .badge-ok  { display: inline-block; background: #d1fae5; color: #065f46; padding: 4px 14px; border-radius: 20px; font-size: 13px; font-weight: 600; margin-bottom: 12px; }
+    .badge-err { display: inline-block; background: #fee2e2; color: #7f1d1d; padding: 4px 14px; border-radius: 20px; font-size: 13px; font-weight: 600; margin-bottom: 12px; }
+    .result-box { margin-top: 16px; }
+    .result-item { border-left: 3px solid #2563eb; background: #f0f7ff; padding: 10px 14px; margin-bottom: 8px; border-radius: 0 6px 6px 0; }
+    .result-item strong { font-size: 13px; color: #1e3a5f; }
+    .result-item small { color: #64748b; font-size: 11px; margin-left: 6px; }
+    .result-item p { font-size: 12px; color: #374151; margin-top: 4px; }
+    pre { background: #f1f5f9; border-radius: 6px; padding: 14px; font-size: 12px; white-space: pre-wrap; margin-top: 12px; }
+    .loading { color: #64748b; font-size: 13px; margin-top: 10px; }
+    .metrics { display: flex; gap: 16px; flex-wrap: wrap; margin: 12px 0; }
+    .metric { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px 14px; font-size: 12px; color: #475569; }
+    .metric strong { display: block; font-size: 18px; color: #1b3a5c; }
+    details { margin-top: 12px; }
+    summary { font-size: 12px; color: #64748b; cursor: pointer; }
+    .tag { display: inline-block; background: #eff6ff; color: #1d4ed8; border-radius: 4px; padding: 2px 8px; font-size: 11px; margin: 2px; font-family: monospace; }
+    .tag-warn { background: #fff7ed; color: #c2410c; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Design System — Painel de Governanca</h1>
+  </div>
+  <div class="container">
+    <div class="card">
+      <h2>Propor novo componente (Q4)</h2>
+      <p>O sistema verifica automaticamente duplicatas e conflitos com decisoes anteriores.</p>
+      <label>Nome do componente</label>
+      <input id="comp-name" placeholder="Ex: Badge de Status">
+      <label>Descricao e caso de uso</label>
+      <textarea id="comp-desc" rows="3" placeholder="Qual problema resolve e como sera usado..."></textarea>
+      <label>Seu nome</label>
+      <input id="comp-author" placeholder="Ex: Ana Silva">
+      <br>
+      <button class="btn" onclick="submitProposal(this)">Enviar para revisao Q4</button>
+      <div id="review-result" class="result-box"></div>
+    </div>
+    <div class="card">
+      <h2>Consultar o Design System (RAG)</h2>
+      <p>Perguntas em linguagem natural sobre tokens, componentes e decisoes.</p>
+      <input id="query-input" placeholder="Ex: Qual e a cor de acao primaria?">
+      <br>
+      <button class="btn" onclick="queryRAG(this)">Consultar</button>
+      <div id="query-result" class="result-box"></div>
+    </div>
+    <!-- Capacidade 1 — Gerar componente novo -->
+    <div class="card">
+      <h2>Gerar componente novo</h2>
+      <p>Q3 verifica duplicatas → Claude gera TSX + Stories → Q2 valida → Q4 avalia → ADR gerado.</p>
+      <label>Nome do componente</label>
+      <input id="gen-name" placeholder="Ex: Badge de Status">
+      <label>Descricao e caso de uso</label>
+      <textarea id="gen-desc" rows="3" placeholder="Qual problema resolve e como sera usado..."></textarea>
+      <label>Variantes (separadas por virgula)</label>
+      <input id="gen-variants" placeholder="Ex: success, warning, error, info">
+      <label>Requisitos de acessibilidade (opcional)</label>
+      <input id="gen-a11y" placeholder="Ex: Deve ter role=status e aria-live=polite">
+      <label>Proposto por</label>
+      <input id="gen-author" placeholder="Ex: Ana Silva">
+      <br>
+      <button class="btn" onclick="generateComponent(this)">Gerar componente</button>
+      <div id="gen-result" class="result-box"></div>
+    </div>
+
+    <!-- Capacidade 2 — Transformar componente legado -->
+    <div class="card">
+      <h2>Transformar componente legado</h2>
+      <p>Q2 detecta hex hard-coded → token_mapper substitui → Claude refatora → Q2 valida.</p>
+      <label>Nome do componente</label>
+      <input id="tr-name" placeholder="Ex: Button">
+      <label>Codigo do componente (TSX)</label>
+      <textarea id="tr-code" rows="8" placeholder="Cole aqui o codigo com hex hard-coded..."></textarea>
+      <br>
+      <button class="btn" onclick="transformComponent(this)">Transformar</button>
+      <div id="tr-result" class="result-box"></div>
+    </div>
+
+    <!-- Capacidade 3 — Gerar a partir do Figma -->
+    <div class="card">
+      <h2>Gerar a partir do Figma</h2>
+      <p>figma_reader extrai propriedades → token_mapper mapeia → Claude gera TSX + Stories.</p>
+      <label>File Key (da URL do Figma)</label>
+      <input id="fig-key" placeholder="Ex: ABC123xyz">
+      <label>Node ID (da URL: ?node-id=...)</label>
+      <input id="fig-node" placeholder="Ex: 123:456 ou 123-456">
+      <label>Nome do componente</label>
+      <input id="fig-name" placeholder="Ex: Button/Primary">
+      <label>Proposto por</label>
+      <input id="fig-author" placeholder="Ex: Ana Silva">
+      <br>
+      <button class="btn" onclick="generateFromFigma(this)">Gerar a partir do Figma</button>
+      <div id="fig-result" class="result-box"></div>
+    </div>
+
+  </div>
+  <script>
+    async function submitProposal(btn) {
+      const name = document.getElementById('comp-name').value.trim();
+      const desc = document.getElementById('comp-desc').value.trim();
+      const author = document.getElementById('comp-author').value.trim();
+      if (!name || !desc || !author) { alert('Preencha todos os campos.'); return; }
+      btn.disabled = true; btn.textContent = 'Avaliando...';
+      document.getElementById('review-result').innerHTML = '<p class="loading">Aguarde...</p>';
+      try {
+        const res = await fetch('/api/review', { method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({component_name:name, description:desc, proposed_by:author})});
+        const d = await res.json();
+        document.getElementById('review-result').innerHTML =
+          '<span class="' + (d.approved?'badge-ok':'badge-err') + '">' +
+          (d.approved?'Aprovado para avancar':'Bloqueado') + '</span>' +
+          '<pre>' + JSON.stringify(d, null, 2) + '</pre>';
+      } catch(e) { document.getElementById('review-result').innerHTML = '<p style="color:red">Erro: '+e.message+'</p>'; }
+      btn.disabled = false; btn.textContent = 'Enviar para revisao Q4';
+    }
+    async function queryRAG(btn) {
+      const q = document.getElementById('query-input').value.trim();
+      if (!q) return;
+      btn.disabled = true; btn.textContent = 'Consultando...';
+      document.getElementById('query-result').innerHTML = '<p class="loading">Buscando no RAG...</p>';
+      try {
+        const res = await fetch('/api/query', { method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({question:q})});
+        const d = await res.json();
+        document.getElementById('query-result').innerHTML = d.detail
+          ? '<p style="color:#92400e">'+d.detail+'</p>'
+          : (d.reference||[]).map(r =>
+            '<div class="result-item"><strong>'+r.name+'</strong>' +
+            '<small>['+r.type+'] '+(r.similarity*100).toFixed(0)+'% similar</small>' +
+            '<p>'+r.content.slice(0,280)+'</p></div>').join('') ||
+            '<p style="color:#64748b">Sem resultados.</p>';
+      } catch(e) { document.getElementById('query-result').innerHTML = '<p style="color:red">Erro: '+e.message+'</p>'; }
+      btn.disabled = false; btn.textContent = 'Consultar';
+    }
+
+    async function generateComponent(btn) {
+      const name = document.getElementById('gen-name').value.trim();
+      const desc = document.getElementById('gen-desc').value.trim();
+      const variants = document.getElementById('gen-variants').value.split(',').map(s=>s.trim()).filter(Boolean);
+      const a11y = document.getElementById('gen-a11y').value.trim();
+      const author = document.getElementById('gen-author').value.trim();
+      if (!name || !desc || !author) { alert('Preencha Nome, Descricao e Proposto por.'); return; }
+      const out = document.getElementById('gen-result');
+      btn.disabled = true; btn.textContent = 'Gerando...';
+      out.innerHTML = '<p class="loading">Consultando RAG, gerando TSX e Stories...</p>';
+      try {
+        const res = await fetch('/api/generate', { method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({name, description:desc, variants, a11y, proposed_by:author})});
+        const d = await res.json();
+        if (!res.ok) { out.innerHTML = '<p style="color:red">Erro '+res.status+': '+(d.detail||'')+'</p>'; return; }
+        const dupTags = (d.rag_duplicates||[]).map(r=>`<span class="tag tag-warn">${r.name} (${(r.similarity*100).toFixed(0)}%)</span>`).join('') || '<span class="tag">nenhuma</span>';
+        const tokenTags = (d.tokens_used||[]).map(t=>`<span class="tag">${t}</span>`).join('') || '—';
+        out.innerHTML =
+          `<span class="${d.approved?'badge-ok':'badge-err'}">${d.approved?'Aprovado':'Aguardando aprovacao'}</span>` +
+          `<div class="metrics">
+            <div class="metric"><strong>${d.score??0}/100</strong>Score Q4</div>
+            <div class="metric"><strong>${d.q2_passed?'✅':'❌'}</strong>Q2 Token Gate</div>
+            <div class="metric"><strong>${d.adr_number?'ADR-'+String(d.adr_number).padStart(3,'0'):'—'}</strong>ADR</div>
+            <div class="metric"><strong>${(d.tokens_used||[]).length}</strong>Tokens usados</div>
+          </div>` +
+          `<div style="margin-bottom:8px"><strong style="font-size:12px">Tokens:</strong> ${tokenTags}</div>` +
+          `<div style="margin-bottom:8px"><strong style="font-size:12px">Duplicatas RAG (>85%):</strong> ${dupTags}</div>` +
+          `<details><summary>TSX gerado</summary><pre>${escHtml(d.tsx_code||'')}</pre></details>` +
+          `<details><summary>Stories gerado</summary><pre>${escHtml(d.stories_code||'')}</pre></details>` +
+          `<details><summary>JSON completo</summary><pre>${escHtml(JSON.stringify(d,null,2))}</pre></details>`;
+      } catch(e) { out.innerHTML = '<p style="color:red">Erro: '+e.message+'</p>'; }
+      btn.disabled = false; btn.textContent = 'Gerar componente';
+    }
+
+    async function transformComponent(btn) {
+      const name = document.getElementById('tr-name').value.trim();
+      const code = document.getElementById('tr-code').value;
+      if (!name || !code.trim()) { alert('Preencha Nome e Codigo.'); return; }
+      const out = document.getElementById('tr-result');
+      btn.disabled = true; btn.textContent = 'Transformando...';
+      out.innerHTML = '<p class="loading">Detectando violacoes, mapeando tokens, refatorando...</p>';
+      try {
+        const res = await fetch('/api/transform', { method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({component_name:name, component_code:code})});
+        const d = await res.json();
+        if (!res.ok) { out.innerHTML = '<p style="color:red">Erro '+res.status+': '+(d.detail||'')+'</p>'; return; }
+        const mappedTags = (d.tokens_mapped||[]).map(m=>`<span class="tag">${m.hex} → ${m.css_var}</span>`).join('');
+        const unmappedTags = (d.unmapped_values||[]).map(h=>`<span class="tag tag-warn">${h}</span>`).join('') || '<span class="tag">nenhum</span>';
+        out.innerHTML =
+          `<span class="${d.q2_passed?'badge-ok':'badge-err'}">${d.q2_passed?'Q2 Aprovado':'Q2 Falhou — hex restante'}</span>` +
+          `<div class="metrics">
+            <div class="metric"><strong>${(d.violations_found||[]).length}</strong>Violacoes encontradas</div>
+            <div class="metric"><strong>${d.violations_fixed??0}</strong>Violacoes corrigidas</div>
+            <div class="metric"><strong>${(d.tokens_mapped||[]).length}</strong>Tokens mapeados</div>
+            <div class="metric"><strong>${(d.unmapped_values||[]).length}</strong>Sem token</div>
+          </div>` +
+          `<div style="margin-bottom:8px"><strong style="font-size:12px">Mapeamentos:</strong> ${mappedTags||'—'}</div>` +
+          `<div style="margin-bottom:8px"><strong style="font-size:12px">Sem token:</strong> ${unmappedTags}</div>` +
+          `<details><summary>Codigo transformado</summary><pre>${escHtml(d.transformed_code||'')}</pre></details>` +
+          `<details><summary>Diff</summary><pre>${escHtml(d.diff||'')}</pre></details>` +
+          `<details><summary>JSON completo</summary><pre>${escHtml(JSON.stringify(d,null,2))}</pre></details>`;
+      } catch(e) { out.innerHTML = '<p style="color:red">Erro: '+e.message+'</p>'; }
+      btn.disabled = false; btn.textContent = 'Transformar';
+    }
+
+    async function generateFromFigma(btn) {
+      const file_key = document.getElementById('fig-key').value.trim();
+      const node_id = document.getElementById('fig-node').value.trim();
+      const name = document.getElementById('fig-name').value.trim();
+      const author = document.getElementById('fig-author').value.trim();
+      if (!file_key || !node_id || !name || !author) { alert('Preencha todos os campos.'); return; }
+      const out = document.getElementById('fig-result');
+      btn.disabled = true; btn.textContent = 'Lendo Figma...';
+      out.innerHTML = '<p class="loading">Lendo node do Figma, mapeando tokens, gerando TSX...</p>';
+      try {
+        const res = await fetch('/api/from-figma', { method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({file_key, node_id, component_name:name, proposed_by:author})});
+        const d = await res.json();
+        if (!res.ok) { out.innerHTML = '<p style="color:red">Erro '+res.status+': '+(d.detail||'')+'</p>'; return; }
+        const mappedTags = (d.token_mapping||[]).map(m=>`<span class="tag">${m.hex} → ${m.css_var}</span>`).join('');
+        const unmappedTags = (d.unmapped_values||[]).map(h=>`<span class="tag tag-warn">${h}</span>`).join('') || '<span class="tag">nenhum</span>';
+        out.innerHTML =
+          `<span class="${d.approved?'badge-ok':'badge-err'}">${d.approved?'Aprovado':'Aguardando aprovacao'}</span>` +
+          `<div class="metrics">
+            <div class="metric"><strong>${d.score??0}/100</strong>Score Q4</div>
+            <div class="metric"><strong>${d.q2_passed?'✅':'❌'}</strong>Q2 Token Gate</div>
+            <div class="metric"><strong>${d.adr_number?'ADR-'+String(d.adr_number).padStart(3,'0'):'—'}</strong>ADR</div>
+            <div class="metric"><strong>${(d.token_mapping||[]).length}</strong>Tokens mapeados</div>
+          </div>` +
+          `<div style="margin-bottom:8px"><strong style="font-size:12px">Figma node:</strong> <span class="tag">${(d.figma_props||{}).node_type||'?'}</span> <span class="tag">${(d.figma_props||{}).name||''}</span></div>` +
+          `<div style="margin-bottom:8px"><strong style="font-size:12px">Mapeamentos:</strong> ${mappedTags||'—'}</div>` +
+          `<div style="margin-bottom:8px"><strong style="font-size:12px">Sem token:</strong> ${unmappedTags}</div>` +
+          `<details><summary>TSX gerado</summary><pre>${escHtml(d.tsx_code||'')}</pre></details>` +
+          `<details><summary>Stories gerado</summary><pre>${escHtml(d.stories_code||'')}</pre></details>` +
+          `<details><summary>JSON completo</summary><pre>${escHtml(JSON.stringify(d,null,2))}</pre></details>`;
+      } catch(e) { out.innerHTML = '<p style="color:red">Erro: '+e.message+'</p>'; }
+      btn.disabled = false; btn.textContent = 'Gerar a partir do Figma';
+    }
+
+    function escHtml(s) {
+      return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+  </script>
+</body>
+</html>

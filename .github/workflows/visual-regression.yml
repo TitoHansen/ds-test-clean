@@ -1,0 +1,43 @@
+name: Q2 — Visual Regression Gate
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'components/**'
+      - 'tokens/**'
+      - 'dist/**'
+
+jobs:
+  visual-regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build tokens
+        run: node style-dictionary.config.js
+
+      - name: Run Storybook visual tests
+        run: npx chromatic --project-token=${{ secrets.CHROMATIC_PROJECT_TOKEN }} --exit-zero-on-changes
+        # Nota: requer conta Chromatic (chromatic.com) e secret configurado no GitHub
+        # Alternativa gratuita: use percy.io ou backstop.js
+        continue-on-error: false
+
+      - name: Comment PR on failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner, repo: context.repo.repo,
+              body: '## ❌ Q2 — Regressão Visual Detectada\nComponentes apresentam diferenças visuais em relação ao baseline. Revise antes de fazer merge.'
+            });

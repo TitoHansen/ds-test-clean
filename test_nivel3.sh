@@ -339,6 +339,12 @@ PYEOF
   [ $C_EXIT -eq 0 ] && ok "Fase C — API real Figma OK" || fail "Fase C — falhou (ver acima)"
 fi
 
+# Pausa entre fases C e D para respeitar rate limit da API Figma
+if [ -n "$FIGMA_TOKEN" ] && [ -n "$TEST_FIGMA_FILE_KEY" ]; then
+  echo "  ⏳ Aguardando 15s antes da fase D (rate limit Figma)..."
+  sleep 15
+fi
+
 # ──────────────────────────────────────────────────────────
 # FASE D — Endpoint /api/from-figma (requer servidor + Figma real)
 # ──────────────────────────────────────────────────────────

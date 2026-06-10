@@ -28,18 +28,25 @@ def _rgba_to_hex(r: float, g: float, b: float) -> str:
     )
 
 
-def _figma_get(path: str) -> dict:
+def _figma_get(path: str, _retries: int = 3) -> dict:
+    import time
     token = os.getenv("FIGMA_TOKEN", "")
     if not token:
         raise ValueError("FIGMA_TOKEN não definido no .env")
     url = f"{FIGMA_API}{path}"
     req = urllib.request.Request(url, headers={"X-Figma-Token": token})
-    try:
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            return json.loads(resp.read().decode())
-    except urllib.error.HTTPError as e:
-        body = e.read().decode()
-        raise RuntimeError(f"Figma API {e.code}: {body[:200]}") from e
+    for attempt in range(_retries):
+        try:
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                return json.loads(resp.read().decode())
+        except urllib.error.HTTPError as e:
+            body = e.read().decode()
+            if e.code == 429 and attempt < _retries - 1:
+                wait = 30 * (attempt + 1)
+                print(f"⏳ Figma rate limit — aguardando {wait}s (tentativa {attempt + 1}/{_retries})...")
+                time.sleep(wait)
+                continue
+            raise RuntimeError(f"Figma API {e.code}: {body[:200]}") from e
 
 
 # ---------------------------------------------------------------------------

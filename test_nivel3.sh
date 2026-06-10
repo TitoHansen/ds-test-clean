@@ -309,6 +309,12 @@ from scripts.token_mapper import map_hex
 
 try:
     result = read_node("$TEST_FIGMA_FILE_KEY", "$TEST_FIGMA_NODE_ID")
+except RuntimeError as e:
+    if "429" in str(e):
+        print(f"SKIP: quota Figma esgotada ({e})")
+        sys.exit(2)
+    print(f"ERRO: {e}")
+    sys.exit(1)
 except Exception as e:
     print(f"ERRO: {e}")
     sys.exit(1)
@@ -336,7 +342,9 @@ print("✓ Estrutura de resposta válida")
 PYEOF
 
   C_EXIT=$?
-  [ $C_EXIT -eq 0 ] && ok "Fase C — API real Figma OK" || fail "Fase C — falhou (ver acima)"
+  if [ $C_EXIT -eq 0 ]; then ok "Fase C — API real Figma OK"
+  elif [ $C_EXIT -eq 2 ]; then skip "Fase C — quota Figma esgotada (tente mais tarde)"
+  else fail "Fase C — falhou (ver acima)"; fi
 fi
 
 # Pausa entre fases C e D para respeitar rate limit da API Figma
@@ -380,6 +388,9 @@ try:
         d = json.loads(resp.read())
 except urllib.error.HTTPError as e:
     body = e.read().decode()
+    if e.code == 502 and "429" in body:
+        print(f"SKIP: quota Figma esgotada")
+        sys.exit(2)
     print(f"HTTP {e.code}: {body[:300]}")
     sys.exit(1)
 except Exception as e:
@@ -416,7 +427,9 @@ print(f"✓ Stories: {len(d.get('stories_code','').splitlines())} linhas")
 PYEOF
 
   D_EXIT=$?
-  [ $D_EXIT -eq 0 ] && ok "Fase D — endpoint /api/from-figma OK" || fail "Fase D — falhou (ver acima)"
+  if [ $D_EXIT -eq 0 ]; then ok "Fase D — endpoint /api/from-figma OK"
+  elif [ $D_EXIT -eq 2 ]; then skip "Fase D — quota Figma esgotada (tente mais tarde)"
+  else fail "Fase D — falhou (ver acima)"; fi
 fi
 
 # ──────────────────────────────────────────────────────────

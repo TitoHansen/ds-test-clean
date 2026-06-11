@@ -1,14 +1,10 @@
 """
-Figma Pusher — sincroniza tokens do DS como Figma Variables via REST API.
+Figma Pusher -- sincroniza tokens do DS como Figma Variables.
 
-Cria duas coleções no arquivo Figma:
-  - "DS / Primitivos"  → valores hex brutos  (color/blue/500)
-  - "DS / Semânticos"  → aliases dos primitivos (color/action/primary)
-
-Requer: FIGMA_TOKEN com escopo file_variables:write
-        Plano Figma Professional ou superior (Variables API)
+REST API (Professional+): POST /v1/files/{key}/variables
+Plugin JS  (Free/qualquer): snippet para colar no console do Figma
 """
-import os, json, glob, uuid
+import os, json, glob, uuid, re
 import urllib.request, urllib.error
 from pathlib import Path
 from dotenv import load_dotenv
@@ -17,8 +13,6 @@ load_dotenv()
 BASE = Path(__file__).parent.parent
 FIGMA_API = "https://api.figma.com/v1"
 
-
-# ─── helpers ────────────────────────────────────────────────────────────────
 
 def _flatten(data: dict, prefix: str = "") -> dict:
     result = {}
@@ -32,17 +26,49 @@ def _flatten(data: dict, prefix: str = "") -> dict:
 
 
 def _hex_to_figma(hex_val: str) -> dict:
-    """'#2563EB' → {'r': 0.145, 'g': 0.388, 'b': 0.922, 'a': 1}"""
     h = hex_val.lstrip("#")
     r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
-    return {"r": round(r / 255, 4), "g": round(g / 255, 4),
-            "b": round(b / 255, 4), "a": 1.0}
+    return {"r": round(r/255,4), "g": round(g/255,4), "b": round(b/255,4), "a": 1.0}
 
+
+def _load_tokens() -> tuple:
+    primitives, semantics = {}, {}
+    for f in glob.glob(str(BASE / "tokens" / "primitive" / "*.json")):
+        primitives.update(_flatten(json.load(open(f))))
+    for f in glob.glob(str(BASE / "tokens" / "semantic" / "*.json")):
+        semantics.update(_flatten(json.load(open(f))))
+    return primitives, semantics
+
+
+def _temp_id() -> str:
+    return "temp_" + uuid.uuid4().hex[:12]
+
+
+def _figma_type(value: str) -> str:
+    if isinstance(value, str) and value.startswith("#"):
+        return "COLOR"
+    if isinstance(value, str) and re.match(r"^[0-9]+\.?[0-9]*(px|em|rem)?$", value.strip()):
+        return "FLOAT"
+    return "STRING"
+
+
+def _js_value(value: str, vtype: str) -> str:
+    if vtype == "COLOR":
+        rgb = _hex_to_figma(value)
+        return "{r:" + str(rgb["r"]) + ",g:" + str(rgb["g"]) + ",b:" + str(rgb["b"]) + ",a:1}"
+    if vtype == "FLOAT":
+        return re.sub(r"[a-z%]+$", "", value.strip())
+    return json.dumps(str(value))
+
+
+# ---------------------------------------------------------------------------
+# REST API (Professional+)
+# ---------------------------------------------------------------------------
 
 def _figma_post(path: str, payload: dict) -> dict:
     token = os.getenv("FIGMA_TOKEN", "")
     if not token:
-        raise ValueError("FIGMA_TOKEN não definido no .env")
+        raise ValueError("FIGMA_TOKEN nao definido no .env")
     body = json.dumps(payload).encode()
     req = urllib.request.Request(
         f"{FIGMA_API}{path}", data=body,
@@ -53,148 +79,85 @@ def _figma_post(path: str, payload: dict) -> dict:
         with urllib.request.urlopen(req, timeout=20) as resp:
             return json.loads(resp.read().decode())
     except urllib.error.HTTPError as e:
-        body_err = e.read().decode()
-        raise RuntimeError(f"Figma API {e.code}: {body_err[:300]}") from e
+        raise RuntimeError(f"Figma API {e.code}: {e.read().decode()[:300]}") from e
 
-
-def _load_tokens() -> tuple:
-    """Retorna (primitivos, semânticos) como dicts de {dotted.path: meta}."""
-    primitives, semantics = {}, {}
-    for f in glob.glob(str(BASE / "tokens" / "primitive" / "*.json")):
-        primitives.update(_flatten(json.load(open(f))))
-    for f in glob.glob(str(BASE / "tokens" / "semantic" / "*.json")):
-        semantics.update(_flatten(json.load(open(f))))
-    return primitives, semantics
-
-
-def _temp_id() -> str:
-    return f"temp_{uuid.uuid4().hex[:12]}"
-
-
-# ─── API pública ─────────────────────────────────────────────────────────────
 
 def push_tokens(file_key: str) -> dict:
-    """
-    Sincroniza tokens do DS como Figma Variables no arquivo especificado.
-
-    Retorna um resumo: { collections_created, variables_created, primitives,
-                         semantics, unmapped, figma_file }
-    """
+    """Sincroniza tokens de COR via REST API (requer Professional+)."""
     primitives, semantics = _load_tokens()
-
-    prim_coll_id = _temp_id()
-    prim_mode_id = _temp_id()
-    sem_coll_id  = _temp_id()
-    sem_mode_id  = _temp_id()
+    prim_coll_id = _temp_id(); prim_mode_id = _temp_id()
+    sem_coll_id  = _temp_id(); sem_mode_id  = _temp_id()
 
     variable_collections = [
-        {"action": "CREATE", "id": prim_coll_id,
-         "name": "DS / Primitivos", "initialModeId": prim_mode_id},
-        {"action": "CREATE", "id": sem_coll_id,
-         "name": "DS / Semânticos", "initialModeId": sem_mode_id},
+        {"action":"CREATE","id":prim_coll_id,"name":"DS / Primitivos","initialModeId":prim_mode_id},
+        {"action":"CREATE","id":sem_coll_id, "name":"DS / Semanticos", "initialModeId":sem_mode_id},
     ]
     variable_modes = [
-        {"action": "CREATE", "id": prim_mode_id,
-         "variableCollectionId": prim_coll_id, "name": "Default"},
-        {"action": "CREATE", "id": sem_mode_id,
-         "variableCollectionId": sem_coll_id, "name": "Default"},
+        {"action":"CREATE","id":prim_mode_id,"variableCollectionId":prim_coll_id,"name":"Default"},
+        {"action":"CREATE","id":sem_mode_id, "variableCollectionId":sem_coll_id, "name":"Default"},
     ]
+    variables, variable_mode_values, prim_id_map = [], [], {}
 
-    variables = []
-    variable_mode_values = []
-    prim_id_map: dict = {}
-
-    # Primitivos
     for path, meta in primitives.items():
-        raw = meta.get("value", "")
-        if not (isinstance(raw, str) and raw.startswith("#")):
-            continue
-        var_id = _temp_id()
-        prim_id_map[path] = var_id
-        variables.append({
-            "action": "CREATE", "id": var_id,
-            "name": path.replace(".", "/"),
-            "variableCollectionId": prim_coll_id,
-            "resolvedType": "COLOR",
-        })
-        variable_mode_values.append({
-            "variableId": var_id,
-            "modeId": prim_mode_id,
-            "value": _hex_to_figma(raw),
-        })
+        raw = meta.get("value","")
+        if not (isinstance(raw,str) and raw.startswith("#")): continue
+        var_id = _temp_id(); prim_id_map[path] = var_id
+        variables.append({"action":"CREATE","id":var_id,"name":path.replace(".","/"),
+                           "variableCollectionId":prim_coll_id,"resolvedType":"COLOR"})
+        variable_mode_values.append({"variableId":var_id,"modeId":prim_mode_id,"value":_hex_to_figma(raw)})
 
-    # Semânticos — alias para primitivos
     unmapped = []
     for path, meta in semantics.items():
-        ref = meta.get("value", "")
-        if isinstance(ref, str) and ref.startswith("{") and ref.endswith("}"):
-            prim_path = ref[1:-1]
-        else:
-            unmapped.append(path)
-            continue
-        if prim_path not in prim_id_map:
-            unmapped.append(path)
-            continue
+        ref = meta.get("value","")
+        if not (isinstance(ref,str) and ref.startswith("{") and ref.endswith("}")): unmapped.append(path); continue
+        prim_path = ref[1:-1]
+        if prim_path not in prim_id_map: unmapped.append(path); continue
         var_id = _temp_id()
-        variables.append({
-            "action": "CREATE", "id": var_id,
-            "name": path.replace(".", "/"),
-            "variableCollectionId": sem_coll_id,
-            "resolvedType": "COLOR",
-        })
-        variable_mode_values.append({
-            "variableId": var_id,
-            "modeId": sem_mode_id,
-            "value": {"type": "VARIABLE_ALIAS", "id": prim_id_map[prim_path]},
-        })
+        variables.append({"action":"CREATE","id":var_id,"name":path.replace(".","/"),
+                           "variableCollectionId":sem_coll_id,"resolvedType":"COLOR"})
+        variable_mode_values.append({"variableId":var_id,"modeId":sem_mode_id,
+                                      "value":{"type":"VARIABLE_ALIAS","id":prim_id_map[prim_path]}})
 
-    payload = {
-        "variableCollections": variable_collections,
-        "variableModes":       variable_modes,
-        "variables":           variables,
-        "variableModeValues":  variable_mode_values,
-    }
-
-    result = _figma_post(f"/files/{file_key}/variables", payload)
-    created_vars  = result.get("meta", {}).get("variables", {})
-    created_colls = result.get("meta", {}).get("variableCollections", {})
-
+    result = _figma_post(f"/files/{file_key}/variables", {
+        "variableCollections":variable_collections,"variableModes":variable_modes,
+        "variables":variables,"variableModeValues":variable_mode_values,
+    })
     return {
-        "collections_created": len(created_colls),
-        "variables_created":   len(created_vars),
-        "primitives":          len(prim_id_map),
-        "semantics":           len(semantics) - len(unmapped),
-        "unmapped":            unmapped,
-        "figma_file":          f"https://figma.com/file/{file_key}",
+        "collections_created": len(result.get("meta",{}).get("variableCollections",{})),
+        "variables_created":   len(result.get("meta",{}).get("variables",{})),
+        "primitives": len(prim_id_map), "semantics": len(semantics)-len(unmapped),
+        "unmapped": unmapped, "figma_file": f"https://figma.com/file/{file_key}",
     }
 
 
-# ─── Plugin JS fallback (plano Free) ─────────────────────────────────────────
+# ---------------------------------------------------------------------------
+# Plugin JS (Free / qualquer plano)  — suporta COLOR, FLOAT e STRING
+# ---------------------------------------------------------------------------
 
 def push_tokens_plugin_js() -> str:
     """
-    Gera snippet JS (Figma Plugin API) para criar as variáveis no Figma.
-    Funciona em qualquer plano, incluindo Free.
-    Cole em: Plugins → Development → Open Console → Enter
+    Gera snippet JS com TODOS os tokens (cor, spacing, tipografia, border, shadow).
+    COLOR -> cores hex, FLOAT -> numeros (px removido), STRING -> texto.
+    Cole em: Plugins > Development > Open Console > Enter
     """
     primitives, semantics = _load_tokens()
 
     prim_lines = []
-    prim_var_names: dict = {}
+    prim_meta = {}  # path -> (js_var, vtype)
 
     for i, (path, meta) in enumerate(primitives.items()):
         raw = meta.get("value", "")
-        if not (isinstance(raw, str) and raw.startswith("#")):
+        if not isinstance(raw, str) or not raw:
             continue
-        rgb = _hex_to_figma(raw)
-        js_var = f"p{i}"
-        prim_var_names[path] = js_var
-        figma_name = path.replace(".", "/")
+        vtype  = _figma_type(raw)
+        js_var = "p" + str(i)
+        prim_meta[path] = (js_var, vtype)
+        name_js = json.dumps(path.replace(".", "/"))
+        val_js  = _js_value(raw, vtype)
         prim_lines.append(
-            f'  const {js_var} = figma.variables.createVariable('
-            f'{json.dumps(figma_name)}, primColl, "COLOR");\n'
-            f'  {js_var}.setValueForMode(primMode, '
-            f'{{r:{rgb["r"]},g:{rgb["g"]},b:{rgb["b"]},a:1}});'
+            '  var ' + js_var + ' = figma.variables.createVariable('
+            + name_js + ', primColl, "' + vtype + '");\n'
+            + '  ' + js_var + '.setValueForMode(primMode, ' + val_js + ');'
         )
 
     sem_lines = []
@@ -203,46 +166,44 @@ def push_tokens_plugin_js() -> str:
         if not (isinstance(ref, str) and ref.startswith("{") and ref.endswith("}")):
             continue
         prim_path = ref[1:-1]
-        if prim_path not in prim_var_names:
+        if prim_path not in prim_meta:
             continue
-        js_prim_var = prim_var_names[prim_path]
-        figma_name = path.replace(".", "/")
+        js_prim_var, prim_vtype = prim_meta[prim_path]
+        name_js = json.dumps(path.replace(".", "/"))
         sem_lines.append(
-            f'  const s{i} = figma.variables.createVariable('
-            f'{json.dumps(figma_name)}, semColl, "COLOR");\n'
-            f'  s{i}.setValueForMode(semMode, '
-            f'figma.variables.createVariableAlias({js_prim_var}));'
+            '  var s' + str(i) + ' = figma.variables.createVariable('
+            + name_js + ', semColl, "' + prim_vtype + '");\n'
+            + '  s' + str(i) + '.setValueForMode(semMode, '
+            + 'figma.variables.createVariableAlias(' + js_prim_var + '));'
         )
 
-    prim_block = "\n".join(prim_lines)
-    sem_block  = "\n".join(sem_lines)
-    n_prim, n_sem = len(prim_lines), len(sem_lines)
+    n_prim = len(prim_lines)
+    n_sem  = len(sem_lines)
 
-    return f"""// Design System -- Sincronizar Tokens como Figma Variables
-// Funciona em qualquer plano (Free incluso)
-// Cole em: Plugins > Development > Open Console > Enter
-(async () => {{
-  var primColl = figma.variables.createVariableCollection("DS / Primitivos");
-  var primMode = primColl.defaultModeId;
-
-{prim_block}
-
-  var semColl = figma.variables.createVariableCollection("DS / Semanticos");
-  var semMode = semColl.defaultModeId;
-
-{sem_block}
-
-  figma.notify("{n_prim} primitivos + {n_sem} semanticos criados!");
-  console.log("Tokens sincronizados.");
-}})();""".strip()
+    return (
+        "// Design System -- Sincronizar Tokens como Figma Variables\n"
+        "// Funciona em qualquer plano (Free incluso)\n"
+        "// Cole em: Plugins > Development > Open Console > Enter\n"
+        "(async () => {\n"
+        '  var primColl = figma.variables.createVariableCollection("DS / Primitivos");\n'
+        "  var primMode = primColl.defaultModeId;\n\n"
+        + "\n".join(prim_lines) + "\n\n"
+        '  var semColl = figma.variables.createVariableCollection("DS / Semanticos");\n'
+        "  var semMode = semColl.defaultModeId;\n\n"
+        + "\n".join(sem_lines) + "\n\n"
+        '  figma.notify("' + str(n_prim) + ' primitivos + ' + str(n_sem) + ' semanticos criados!");\n'
+        '  console.log("Tokens sincronizados.");\n'
+        "})();"
+    )
 
 
-# ─── CLI ─────────────────────────────────────────────────────────────────────
+# ---------------------------------------------------------------------------
+# CLI
+# ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
     import sys
-    if len(sys.argv) < 2:
-        print("Uso: python scripts/figma_pusher.py <file_key>")
-        sys.exit(1)
-    result = push_tokens(sys.argv[1])
-    print(json.dumps(result, ensure_ascii=False, indent=2))
+    if len(sys.argv) > 1:
+        print(json.dumps(push_tokens(sys.argv[1]), ensure_ascii=False, indent=2))
+    else:
+        print(push_tokens_plugin_js())

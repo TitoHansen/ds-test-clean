@@ -128,18 +128,16 @@ def generate_plugin_js(component_name: str, tsx_code: str) -> str:
         for i, txt in enumerate(texts)
     )
 
-    token_comments = "\n".join(f"  // {d['token']} → {d['hex']}" for d in fills + strokes)
+    token_comments = "\n".join(f"  // {d['token']} -> {d['hex']}" for d in fills + strokes)
 
-    return f"""// ──────────────────────────────────────────────────────────
-// Componente: {component_name}
+    return f"""// Componente: {component_name}
 // Gerado pelo Design System AI
-// Cole em: Plugins → Development → Open Console → Enter
-// ──────────────────────────────────────────────────────────
+// Cole em: Plugins > Development > Open Console > Enter
 (async () => {{
   // Tokens mapeados:
 {token_comments}
 
-  const comp = figma.createComponent();
+  var comp = figma.createComponent();
   comp.name = {json.dumps(component_name)};
   comp.layoutMode   = '{layout["direction"]}';
   comp.paddingTop   = {layout["paddingV"]};
@@ -157,7 +155,7 @@ def generate_plugin_js(component_name: str, tsx_code: str) -> str:
 
   figma.currentPage.appendChild(comp);
   figma.viewport.scrollAndZoomIntoView([comp]);
-  figma.notify('✅ {component_name} criado!');
+  figma.notify("{component_name} criado com sucesso!");
 }})();""".strip()
 
 

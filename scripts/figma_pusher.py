@@ -218,24 +218,22 @@ def push_tokens_plugin_js() -> str:
     sem_block  = "\n".join(sem_lines)
     n_prim, n_sem = len(prim_lines), len(sem_lines)
 
-    return f"""// ──────────────────────────────────────────────────────────
-// Design System — Sincronizar Tokens como Figma Variables
+    return f"""// Design System -- Sincronizar Tokens como Figma Variables
 // Funciona em qualquer plano (Free incluso)
-// Cole em: Plugins → Development → Open Console → Enter
-// ──────────────────────────────────────────────────────────
+// Cole em: Plugins > Development > Open Console > Enter
 (async () => {{
-  const primColl = figma.variables.createVariableCollection("DS / Primitivos");
-  const primMode = primColl.defaultModeId;
+  var primColl = figma.variables.createVariableCollection("DS / Primitivos");
+  var primMode = primColl.defaultModeId;
 
 {prim_block}
 
-  const semColl = figma.variables.createVariableCollection("DS / Semanticos");
-  const semMode = semColl.defaultModeId;
+  var semColl = figma.variables.createVariableCollection("DS / Semanticos");
+  var semMode = semColl.defaultModeId;
 
 {sem_block}
 
-  figma.notify('✅ {n_prim} primitivos + {n_sem} semanticos criados!');
-  console.log('Tokens sincronizados com sucesso.');
+  figma.notify("{n_prim} primitivos + {n_sem} semanticos criados!");
+  console.log("Tokens sincronizados.");
 }})();""".strip()
 
 

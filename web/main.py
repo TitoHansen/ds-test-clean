@@ -40,6 +40,7 @@ class FigmaRequest(BaseModel):
 
 class PushTokensRequest(BaseModel):
     file_key: str
+    mode: str = "auto"   # "auto" | "rest" | "plugin"
 
 class ToFigmaRequest(BaseModel):
     component_name: str
@@ -468,25 +469,38 @@ async def transform(req: TransformRequest):
 async def push_tokens(req: PushTokensRequest):
     """
     Sincroniza tokens do DS como Figma Variables.
-    Tenta REST API (Professional+); em plano Free retorna snippet Plugin JS.
+    mode=auto   → tenta REST, cai para plugin se 403
+    mode=rest   → REST API apenas (Professional+)
+    mode=plugin → Plugin JS apenas (Free / qualquer conta)
     """
     from scripts.figma_pusher import push_tokens as _push, push_tokens_plugin_js
+
+    _PLUGIN_INSTRUCTIONS = (
+        "1. Abra o arquivo no Figma\n"
+        "2. Menu: Plugins → Development → Open Console\n"
+        "3. Cole o codigo plugin_js e pressione Enter\n"
+        "4. As colecoes DS/Primitivos e DS/Semanticos serao criadas"
+    )
+
+    # Modo plugin direto (Free / conta pública)
+    if req.mode == "plugin":
+        return {
+            "mode": "plugin",
+            "plugin_js": push_tokens_plugin_js(),
+            "instructions": _PLUGIN_INSTRUCTIONS,
+        }
+
+    # Modo REST (Professional+)
     try:
         result = _push(req.file_key)
         result["mode"] = "rest"
         return result
     except RuntimeError as e:
-        if "403" in str(e) and "file_variables:write" in str(e):
-            js = push_tokens_plugin_js()
+        if req.mode == "auto" and "403" in str(e) and "file_variables:write" in str(e):
             return {
                 "mode": "plugin",
-                "plugin_js": js,
-                "instructions": (
-                    "Plano Free detectado — use o snippet abaixo:\n"
-                    "1. Abra o arquivo no Figma\n"
-                    "2. Menu: Plugins → Development → Open Console\n"
-                    "3. Cole o codigo plugin_js e pressione Enter"
-                ),
+                "plugin_js": push_tokens_plugin_js(),
+                "instructions": "Plano Free detectado — " + _PLUGIN_INSTRUCTIONS,
             }
         raise HTTPException(status_code=502, detail=str(e))
     except Exception as e:

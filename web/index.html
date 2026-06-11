@@ -115,8 +115,20 @@
     <!-- Sincronizar tokens → Figma Variables -->
     <div class="card">
       <h2>Sincronizar tokens → Figma Variables</h2>
-      <p>Publica os tokens do DS como coleções de variáveis no arquivo Figma. Requer plano Professional e FIGMA_TOKEN com escopo file_variables:write.</p>
-      <label>File Key do Figma</label>
+      <p>Publica os tokens do DS como coleções de variáveis no Figma.</p>
+      <label>Modo</label>
+      <div style="display:flex;gap:10px;margin:8px 0 4px">
+        <label style="margin:0;font-weight:400;display:flex;align-items:center;gap:6px;cursor:pointer">
+          <input type="radio" name="pt-mode" value="auto" checked> Auto (tenta REST, cai para plugin)
+        </label>
+        <label style="margin:0;font-weight:400;display:flex;align-items:center;gap:6px;cursor:pointer">
+          <input type="radio" name="pt-mode" value="rest"> REST — Professional+
+        </label>
+        <label style="margin:0;font-weight:400;display:flex;align-items:center;gap:6px;cursor:pointer">
+          <input type="radio" name="pt-mode" value="plugin"> Plugin JS — Free / público
+        </label>
+      </div>
+      <label>File Key do Figma <span style="color:#94a3b8;font-weight:400">(necessário apenas no modo REST)</span></label>
       <input id="pt-key" placeholder="Ex: tbqHKpcj3jUCsREEFx8MCS">
       <br>
       <button class="btn" onclick="pushTokens(this)">Sincronizar tokens</button>
@@ -281,15 +293,16 @@
     }
 
     async function pushTokens(btn) {
+      const mode = document.querySelector('input[name="pt-mode"]:checked')?.value || 'auto';
       const key = document.getElementById('pt-key').value.trim();
-      if (!key) { alert('Informe o File Key do Figma.'); return; }
+      if (mode !== 'plugin' && !key) { alert('Informe o File Key do Figma.'); return; }
       const out = document.getElementById('pt-result');
       btn.disabled = true; btn.textContent = 'Sincronizando...';
       out.innerHTML = '<p class="loading">Publicando tokens como Figma Variables...</p>';
       try {
         const res = await fetch('/api/push-tokens', { method:'POST',
           headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({file_key:key})});
+          body: JSON.stringify({file_key:key, mode})});
         const d = await res.json();
         if (!res.ok) { out.innerHTML = '<p style="color:red">Erro '+res.status+': '+(d.detail||'')+'</p>'; return; }
         if (d.mode === 'plugin') {

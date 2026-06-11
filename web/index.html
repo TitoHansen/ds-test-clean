@@ -292,16 +292,25 @@
           body: JSON.stringify({file_key:key})});
         const d = await res.json();
         if (!res.ok) { out.innerHTML = '<p style="color:red">Erro '+res.status+': '+(d.detail||'')+'</p>'; return; }
-        out.innerHTML =
-          `<span class="badge-ok">Tokens sincronizados</span>` +
-          `<div class="metrics">
-            <div class="metric"><strong>${d.collections_created??0}</strong>Colecoes criadas</div>
-            <div class="metric"><strong>${d.variables_created??0}</strong>Variaveis criadas</div>
-            <div class="metric"><strong>${d.primitives??0}</strong>Primitivos</div>
-            <div class="metric"><strong>${d.semantics??0}</strong>Semanticos</div>
-          </div>` +
-          (d.unmapped?.length ? `<div style="margin-bottom:8px"><strong style="font-size:12px">Sem referencia:</strong> ${d.unmapped.map(u=>`<span class="tag tag-warn">${u}</span>`).join('')}</div>` : '') +
-          `<div><a href="${d.figma_file}" target="_blank" style="font-size:12px;color:#2563eb">Abrir no Figma →</a></div>`;
+        if (d.mode === 'plugin') {
+          out.innerHTML =
+            `<span class="badge-err">Plano Free — use o snippet abaixo</span>` +
+            `<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:12px;margin:12px 0;font-size:12px;color:#92400e;">`+
+            escHtml(d.instructions||'').replace(/\n/g,'<br>') + `</div>` +
+            `<details open><summary>Codigo para colar no Figma Console</summary>` +
+            `<pre style="cursor:pointer" onclick="navigator.clipboard.writeText(${JSON.stringify(d.plugin_js||'')});this.style.background='#d1fae5';setTimeout(()=>this.style.background='',1500)" title="Clique para copiar">${escHtml(d.plugin_js||'')}</pre></details>`;
+        } else {
+          out.innerHTML =
+            `<span class="badge-ok">Tokens sincronizados via REST</span>` +
+            `<div class="metrics">
+              <div class="metric"><strong>${d.collections_created??0}</strong>Colecoes criadas</div>
+              <div class="metric"><strong>${d.variables_created??0}</strong>Variaveis criadas</div>
+              <div class="metric"><strong>${d.primitives??0}</strong>Primitivos</div>
+              <div class="metric"><strong>${d.semantics??0}</strong>Semanticos</div>
+            </div>` +
+            (d.unmapped?.length ? `<div><strong style="font-size:12px">Sem referencia:</strong> ${d.unmapped.map(u=>`<span class="tag tag-warn">${u}</span>`).join('')}</div>` : '') +
+            `<div><a href="${d.figma_file}" target="_blank" style="font-size:12px;color:#2563eb">Abrir no Figma →</a></div>`;
+        }
       } catch(e) { out.innerHTML = '<p style="color:red">Erro: '+e.message+'</p>'; }
       btn.disabled = false; btn.textContent = 'Sincronizar tokens';
     }

@@ -169,6 +169,76 @@ def push_tokens(file_key: str) -> dict:
     }
 
 
+# ─── Plugin JS fallback (plano Free) ─────────────────────────────────────────
+
+def push_tokens_plugin_js() -> str:
+    """
+    Gera snippet JS (Figma Plugin API) para criar as variáveis no Figma.
+    Funciona em qualquer plano, incluindo Free.
+    Cole em: Plugins → Development → Open Console → Enter
+    """
+    primitives, semantics = _load_tokens()
+
+    prim_lines = []
+    prim_var_names: dict = {}
+
+    for i, (path, meta) in enumerate(primitives.items()):
+        raw = meta.get("value", "")
+        if not (isinstance(raw, str) and raw.startswith("#")):
+            continue
+        rgb = _hex_to_figma(raw)
+        js_var = f"p{i}"
+        prim_var_names[path] = js_var
+        figma_name = path.replace(".", "/")
+        prim_lines.append(
+            f'  const {js_var} = figma.variables.createVariable('
+            f'{json.dumps(figma_name)}, primColl, "COLOR");\n'
+            f'  {js_var}.setValueForMode(primMode, '
+            f'{{r:{rgb["r"]},g:{rgb["g"]},b:{rgb["b"]},a:1}});'
+        )
+
+    sem_lines = []
+    for i, (path, meta) in enumerate(semantics.items()):
+        ref = meta.get("value", "")
+        if not (isinstance(ref, str) and ref.startswith("{") and ref.endswith("}")):
+            continue
+        prim_path = ref[1:-1]
+        if prim_path not in prim_var_names:
+            continue
+        js_prim_var = prim_var_names[prim_path]
+        figma_name = path.replace(".", "/")
+        sem_lines.append(
+            f'  const s{i} = figma.variables.createVariable('
+            f'{json.dumps(figma_name)}, semColl, "COLOR");\n'
+            f'  s{i}.setValueForMode(semMode, '
+            f'figma.variables.createVariableAlias({js_prim_var}));'
+        )
+
+    prim_block = "\n".join(prim_lines)
+    sem_block  = "\n".join(sem_lines)
+    n_prim, n_sem = len(prim_lines), len(sem_lines)
+
+    return f"""// ──────────────────────────────────────────────────────────
+// Design System — Sincronizar Tokens como Figma Variables
+// Funciona em qualquer plano (Free incluso)
+// Cole em: Plugins → Development → Open Console → Enter
+// ──────────────────────────────────────────────────────────
+(async () => {{
+  const primColl = figma.variables.createVariableCollection("DS / Primitivos");
+  const primMode = primColl.defaultModeId;
+
+{prim_block}
+
+  const semColl = figma.variables.createVariableCollection("DS / Semanticos");
+  const semMode = semColl.defaultModeId;
+
+{sem_block}
+
+  figma.notify('✅ {n_prim} primitivos + {n_sem} semanticos criados!');
+  console.log('Tokens sincronizados com sucesso.');
+}})();""".strip()
+
+
 # ─── CLI ─────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":

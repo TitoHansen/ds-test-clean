@@ -466,14 +466,29 @@ async def transform(req: TransformRequest):
 
 @app.post("/api/push-tokens")
 async def push_tokens(req: PushTokensRequest):
-    """Sincroniza tokens do DS como Figma Variables no arquivo especificado."""
+    """
+    Sincroniza tokens do DS como Figma Variables.
+    Tenta REST API (Professional+); em plano Free retorna snippet Plugin JS.
+    """
+    from scripts.figma_pusher import push_tokens as _push, push_tokens_plugin_js
     try:
-        from scripts.figma_pusher import push_tokens as _push
         result = _push(req.file_key)
+        result["mode"] = "rest"
         return result
     except RuntimeError as e:
-        status = 403 if "403" in str(e) else 502
-        raise HTTPException(status_code=status, detail=str(e))
+        if "403" in str(e) and "file_variables:write" in str(e):
+            js = push_tokens_plugin_js()
+            return {
+                "mode": "plugin",
+                "plugin_js": js,
+                "instructions": (
+                    "Plano Free detectado — use o snippet abaixo:\n"
+                    "1. Abra o arquivo no Figma\n"
+                    "2. Menu: Plugins → Development → Open Console\n"
+                    "3. Cole o codigo plugin_js e pressione Enter"
+                ),
+            }
+        raise HTTPException(status_code=502, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

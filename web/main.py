@@ -38,6 +38,13 @@ class FigmaRequest(BaseModel):
     component_name: str
     proposed_by: str
 
+class PushTokensRequest(BaseModel):
+    file_key: str
+
+class ToFigmaRequest(BaseModel):
+    component_name: str
+    tsx_code: str
+
 @app.get("/", response_class=HTMLResponse)
 async def root():
     try:
@@ -455,6 +462,40 @@ async def transform(req: TransformRequest):
         "q2_passed": q2_passed,
         "q2_remaining": [{"hex": h} for h in remaining_hex],
     }
+
+
+@app.post("/api/push-tokens")
+async def push_tokens(req: PushTokensRequest):
+    """Sincroniza tokens do DS como Figma Variables no arquivo especificado."""
+    try:
+        from scripts.figma_pusher import push_tokens as _push
+        result = _push(req.file_key)
+        return result
+    except RuntimeError as e:
+        status = 403 if "403" in str(e) else 502
+        raise HTTPException(status_code=status, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/to-figma")
+async def to_figma(req: ToFigmaRequest):
+    """Gera snippet JS (Figma Plugin API) para criar o componente visualmente no Figma."""
+    try:
+        from scripts.figma_plugin_gen import generate_plugin_js
+        js = generate_plugin_js(req.component_name, req.tsx_code)
+        return {
+            "component_name": req.component_name,
+            "plugin_js": js,
+            "instructions": (
+                "1. Abra o arquivo no Figma\n"
+                "2. Menu: Plugins → Development → Open Console\n"
+                "3. Cole o código plugin_js e pressione Enter\n"
+                "4. O componente será criado na página atual"
+            ),
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/api/health")

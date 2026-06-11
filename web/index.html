@@ -112,6 +112,30 @@
       <div id="fig-result" class="result-box"></div>
     </div>
 
+    <!-- Sincronizar tokens → Figma Variables -->
+    <div class="card">
+      <h2>Sincronizar tokens → Figma Variables</h2>
+      <p>Publica os tokens do DS como coleções de variáveis no arquivo Figma. Requer plano Professional e FIGMA_TOKEN com escopo file_variables:write.</p>
+      <label>File Key do Figma</label>
+      <input id="pt-key" placeholder="Ex: tbqHKpcj3jUCsREEFx8MCS">
+      <br>
+      <button class="btn" onclick="pushTokens(this)">Sincronizar tokens</button>
+      <div id="pt-result" class="result-box"></div>
+    </div>
+
+    <!-- Criar componente no Figma -->
+    <div class="card">
+      <h2>Criar componente no Figma</h2>
+      <p>Gera um snippet JavaScript (Figma Plugin API) a partir do TSX. Cole no console do Figma para criar o componente visualmente.</p>
+      <label>Nome do componente</label>
+      <input id="tf-name" placeholder="Ex: Button">
+      <label>Codigo TSX</label>
+      <textarea id="tf-tsx" rows="6" placeholder="Cole aqui o codigo TSX gerado..."></textarea>
+      <br>
+      <button class="btn" onclick="toFigma(this)">Gerar snippet Figma</button>
+      <div id="tf-result" class="result-box"></div>
+    </div>
+
   </div>
   <script>
     async function submitProposal(btn) {
@@ -254,6 +278,56 @@
           `<details><summary>JSON completo</summary><pre>${escHtml(JSON.stringify(d,null,2))}</pre></details>`;
       } catch(e) { out.innerHTML = '<p style="color:red">Erro: '+e.message+'</p>'; }
       btn.disabled = false; btn.textContent = 'Gerar a partir do Figma';
+    }
+
+    async function pushTokens(btn) {
+      const key = document.getElementById('pt-key').value.trim();
+      if (!key) { alert('Informe o File Key do Figma.'); return; }
+      const out = document.getElementById('pt-result');
+      btn.disabled = true; btn.textContent = 'Sincronizando...';
+      out.innerHTML = '<p class="loading">Publicando tokens como Figma Variables...</p>';
+      try {
+        const res = await fetch('/api/push-tokens', { method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({file_key:key})});
+        const d = await res.json();
+        if (!res.ok) { out.innerHTML = '<p style="color:red">Erro '+res.status+': '+(d.detail||'')+'</p>'; return; }
+        out.innerHTML =
+          `<span class="badge-ok">Tokens sincronizados</span>` +
+          `<div class="metrics">
+            <div class="metric"><strong>${d.collections_created??0}</strong>Colecoes criadas</div>
+            <div class="metric"><strong>${d.variables_created??0}</strong>Variaveis criadas</div>
+            <div class="metric"><strong>${d.primitives??0}</strong>Primitivos</div>
+            <div class="metric"><strong>${d.semantics??0}</strong>Semanticos</div>
+          </div>` +
+          (d.unmapped?.length ? `<div style="margin-bottom:8px"><strong style="font-size:12px">Sem referencia:</strong> ${d.unmapped.map(u=>`<span class="tag tag-warn">${u}</span>`).join('')}</div>` : '') +
+          `<div><a href="${d.figma_file}" target="_blank" style="font-size:12px;color:#2563eb">Abrir no Figma →</a></div>`;
+      } catch(e) { out.innerHTML = '<p style="color:red">Erro: '+e.message+'</p>'; }
+      btn.disabled = false; btn.textContent = 'Sincronizar tokens';
+    }
+
+    async function toFigma(btn) {
+      const name = document.getElementById('tf-name').value.trim();
+      const tsx  = document.getElementById('tf-tsx').value.trim();
+      if (!name || !tsx) { alert('Preencha Nome e codigo TSX.'); return; }
+      const out = document.getElementById('tf-result');
+      btn.disabled = true; btn.textContent = 'Gerando plugin...';
+      out.innerHTML = '<p class="loading">Gerando snippet Figma Plugin...</p>';
+      try {
+        const res = await fetch('/api/to-figma', { method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({component_name:name, tsx_code:tsx})});
+        const d = await res.json();
+        if (!res.ok) { out.innerHTML = '<p style="color:red">Erro '+res.status+': '+(d.detail||'')+'</p>'; return; }
+        out.innerHTML =
+          `<span class="badge-ok">Snippet gerado</span>` +
+          `<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:12px;margin:12px 0;font-size:12px;color:#166534;">` +
+          escHtml(d.instructions||'').replace(/\n/g,'<br>') + `</div>` +
+          `<details open><summary>Codigo para colar no Figma Console</summary>` +
+          `<pre style="cursor:pointer" onclick="navigator.clipboard.writeText(${JSON.stringify(d.plugin_js||'')});this.style.background='#d1fae5';setTimeout(()=>this.style.background='',1500)"` +
+          ` title="Clique para copiar">${escHtml(d.plugin_js||'')}</pre></details>`;
+      } catch(e) { out.innerHTML = '<p style="color:red">Erro: '+e.message+'</p>'; }
+      btn.disabled = false; btn.textContent = 'Gerar snippet Figma';
     }
 
     function escHtml(s) {

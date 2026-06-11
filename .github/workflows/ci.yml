@@ -1,0 +1,39 @@
+name: CI -- Design System Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Q2 -- Token Linter (nivel 1)
+        run: bash test_nivel1.sh
+
+      - name: Figma Integration -- unit + mock (nivel 3 fases A e B)
+        run: bash test_nivel3.sh
+        # Fases C e D sao puladas automaticamente sem FIGMA_TOKEN
+        # Para ativar: adicione FIGMA_TOKEN, TEST_FIGMA_FILE_KEY,
+        # TEST_FIGMA_NODE_ID nos Secrets do repositorio
+        env:
+          ANTHROPIC_API_KEY: placeholder
+          OPENAI_API_KEY: placeholder
+          DATABASE_URL: placeholder
+
+      - name: Token CSS export smoke test
+        run: python3 scripts/token_exporter.py | grep -q "\-\-ds-color-action-primary" && echo "CSS export OK"

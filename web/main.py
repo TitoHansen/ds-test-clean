@@ -1,5 +1,5 @@
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, PlainTextResponse
 from pydantic import BaseModel
 import sys, os, re, json, difflib
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -523,6 +523,18 @@ async def to_figma(req: ToFigmaRequest):
                 "4. O componente será criado na página atual"
             ),
         }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+
+@app.get("/api/tokens.css", response_class=PlainTextResponse)
+async def tokens_css():
+    """Exporta todos os tokens do DS como CSS custom properties."""
+    try:
+        from scripts.token_exporter import export_css
+        css = export_css()
+        return PlainTextResponse(content=css, media_type="text/css")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
